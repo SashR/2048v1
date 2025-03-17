@@ -4,41 +4,50 @@ import NumberBlock from './../2048/NumberBlock';
 import { useEffect, useState } from 'react';
 
 export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<{ laravelVersion: string, phpVersion: string }>) {
-    const data = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16];
-
     const [rows, setRows] = useState([
-        [null, null, null, 2],
-        [null, 8 ,null, 4],
-        [512, null, 16, null],
-        [64, 8, 4, 2]
+        null, null, null, 2,
+        null, 8 ,null, 4,
+        512, null, 16, null,
+        64, 8, 4, 2
     ]);
 
-    const leftShift = (row:Array<number|null>) => {
+    const leftShift = (rows:Array<number|null>):Array<number|null> => {
         const op = [];
-        for(let v of row)
-            if(v) op.push(v);
-        return [...op, ...(new Array(row.length-op.length).map(_=>null))];
+        for(let i=0; i<15; i+=4){
+            const temp = rows.slice(i, i+4).filter(v=>v);
+            op.push(...temp, ...(new Array(4-temp.length).fill(null)));
+        }
+        return op;
     }
 
-    const rightShift = (row:Array<number|null>) => {
+    const rightShift = (rows:Array<number|null>):Array<number|null> => {
         const op = [];
-        for(let v of row)
-            if(v) op.push(v);
-        return [...(new Array(row.length-op.length).map(_=>null)), ...op];
+        for(let i=0; i<15; i+=4){
+            const temp = rows.slice(i, i+4).filter(v=>v);
+            op.push(...(new Array(4-temp.length).fill(null)),...temp);
+        }
+        return op;
+    }
+
+    const upShift = (arr: Array<number|null>): Array<number|null> => {
+        const op = (new Array(15)).fill(null);
+        for(let i=0; i<4; i++){
+            const temp = ([arr[i], arr[i+4], arr[i+8], arr[i+12]]).filter(v=>v);
+            [op[i], op[i+4], op[i+8], op[i+12]] = [...temp, ...(new Array(4-temp.length).fill(null))];
+        }
+        return op;
+    }
+
+    const downShift = (arr: Array<number|null>): Array<number|null> => {
+        const op = (new Array(15)).fill(null);
+        for(let i=0; i<4; i++){
+            const temp = ([arr[i], arr[i+4], arr[i+8], arr[i+12]]).filter(v=>v);
+            [op[i], op[i+4], op[i+8], op[i+12]] = [...(new Array(4-temp.length).fill(null)), ...temp];
+        }
+        return op;
     }
 
     useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-          // Check if the left arrow key is pressed
-          if (event.key === 'ArrowLeft') {
-            console.log("Left arrow key pressed!");
-
-            // leftShift([null, null, null, 2]);
-            setRows(rows.map(row => leftShift(row)));
-          }
-          if (event.key === 'ArrowRight') setRows(rows.map(row => rightShift(row)));
-        };
-
         // Add event listener for keydown event
         window.addEventListener('keydown', handleKeyDown);
 
@@ -47,6 +56,20 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
           window.removeEventListener('keydown', handleKeyDown);
         };
       }, []);
+
+    useEffect(()=>{
+        console.log("Changed: ", rows);
+    }, rows);
+
+    const handleKeyDown = (event: KeyboardEvent):void => {
+        switch(event.key){
+            case 'ArrowLeft': setRows(rows => leftShift(rows)); break;
+            case 'ArrowRight': setRows(rows => rightShift(rows)); break;
+            case 'ArrowUp': setRows(rows => upShift(rows)); break;
+            case 'ArrowDown': setRows(rows => downShift(rows)); break;
+        }
+    };
+
 
     return (
         <>
@@ -81,7 +104,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
 
                 <div className="w-96 bg-slate-400 h-96 rounded-md flex justify-evenly items-center flex-wrap">
                 {
-                    rows.map((r,i) => r.map((v,j) => <NumberBlock text={v} key={`${i}${j}`}  />))
+                    rows.map((v,i) => <NumberBlock text={v} key={`${i}`}  />)
                 }
                 </div>
 
