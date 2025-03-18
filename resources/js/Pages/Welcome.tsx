@@ -4,53 +4,75 @@ import NumberBlock from './../2048/NumberBlock';
 import { useEffect, useState } from 'react';
 
 export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<{ laravelVersion: string, phpVersion: string }>) {
-    const [rows, setRows] = useState([
-        null, null, null, 2,
-        null, 8 ,null, 4,
-        512, null, 16, null,
-        64, 8, 4, 2
-    ]);
+    const [rows, setRows] = useState(new Array(16).fill(null));
+
+    const combine = (arr: number[], fwd:boolean = true) => {
+        const op: number[] = [];
+        if(fwd){
+            for(let i=0; i<arr.length; i++){
+                if(i<arr.length-1 && arr[i]==arr[i+1]){
+                    op.push(arr[i]*2);
+                    i++;
+                } else op.push(arr[i]);
+            }
+        } else {
+            for(let i=arr.length-1; i>=0; i--){
+                if(i>0 && arr[i]==arr[i-1]){
+                    op.unshift(arr[i]*2);
+                    i--;
+                } else op.unshift(arr[i]);
+            }
+        }
+        return op;
+    }
+
+    const generate = (arr: Array<number|null>) => {
+        const emptyIds = arr.map((v,i) => v==null ? i : null).filter(v => typeof v=='number');
+        const id = emptyIds[Math.floor(Math.random() * emptyIds.length)];
+        return arr.map((v,i) => i===id ? 2 : v);
+    }
 
     const leftShift = (rows:Array<number|null>):Array<number|null> => {
         const op = [];
         for(let i=0; i<15; i+=4){
-            const temp = rows.slice(i, i+4).filter(v=>v);
+            const temp: number[] = combine(rows.slice(i, i+4).filter(v=>typeof v=='number'));
             op.push(...temp, ...(new Array(4-temp.length).fill(null)));
         }
-        return op;
+        return generate(op);
     }
 
     const rightShift = (rows:Array<number|null>):Array<number|null> => {
         const op = [];
         for(let i=0; i<15; i+=4){
-            const temp = rows.slice(i, i+4).filter(v=>v);
+            const temp: number[] = combine(rows.slice(i, i+4).filter(v=>typeof v=='number'), false);
             op.push(...(new Array(4-temp.length).fill(null)),...temp);
         }
-        return op;
+        return generate(op);
     }
 
     const upShift = (arr: Array<number|null>): Array<number|null> => {
         const op = (new Array(15)).fill(null);
         for(let i=0; i<4; i++){
-            const temp = ([arr[i], arr[i+4], arr[i+8], arr[i+12]]).filter(v=>v);
+            const temp: number[] = combine([arr[i], arr[i+4], arr[i+8], arr[i+12]].filter(v=>typeof v=='number'));
             [op[i], op[i+4], op[i+8], op[i+12]] = [...temp, ...(new Array(4-temp.length).fill(null))];
         }
-        return op;
+        return generate(op);
     }
 
     const downShift = (arr: Array<number|null>): Array<number|null> => {
         const op = (new Array(15)).fill(null);
         for(let i=0; i<4; i++){
-            const temp = ([arr[i], arr[i+4], arr[i+8], arr[i+12]]).filter(v=>v);
+            const temp: number[] = combine([arr[i], arr[i+4], arr[i+8], arr[i+12]].filter(v=>typeof v=='number'), false);
             [op[i], op[i+4], op[i+8], op[i+12]] = [...(new Array(4-temp.length).fill(null)), ...temp];
         }
-        return op;
+        return generate(op);
     }
 
     useEffect(() => {
+        setRows(rows => generate(rows));
         // Add event listener for keydown event
         window.addEventListener('keydown', handleKeyDown);
-
+        generate(rows);
         // Clean up event listener on component unmount
         return () => {
           window.removeEventListener('keydown', handleKeyDown);
