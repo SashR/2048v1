@@ -5,12 +5,14 @@ import { useEffect, useState } from 'react';
 
 export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<{ laravelVersion: string, phpVersion: string }>) {
     const [rows, setRows] = useState(new Array(16).fill(null));
+    const [score, setScore] = useState(0);
 
     const combine = (arr: number[], fwd:boolean = true) => {
         const op: number[] = [];
         if(fwd){
             for(let i=0; i<arr.length; i++){
                 if(i<arr.length-1 && arr[i]==arr[i+1]){
+                    setScore(score=> score+arr[i]*2);
                     op.push(arr[i]*2);
                     i++;
                 } else op.push(arr[i]);
@@ -18,6 +20,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
         } else {
             for(let i=arr.length-1; i>=0; i--){
                 if(i>0 && arr[i]==arr[i-1]){
+                    setScore(score=> score+arr[i]*2);
                     op.unshift(arr[i]*2);
                     i--;
                 } else op.unshift(arr[i]);
@@ -29,7 +32,8 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
     const generate = (arr: Array<number|null>) => {
         const emptyIds = arr.map((v,i) => v==null ? i : null).filter(v => typeof v=='number');
         const id = emptyIds[Math.floor(Math.random() * emptyIds.length)];
-        return arr.map((v,i) => i===id ? 2 : v);
+        const numGen :number = Math.floor(Math.random() * 10) < 7 ? 2 : 4;
+        return arr.map((v,i) => i===id ? numGen : v);
     }
 
     const leftShift = (rows:Array<number|null>):Array<number|null> => {
@@ -96,7 +100,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
     return (
         <>
             <Head title="Welcome"/>
-            <div className="relative sm:flex sm:justify-center sm:items-center min-h-screen bg-dots-darker bg-center bg-gray-100 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white">
+            <div className="relative sm:flex flex-col sm:justify-start pt-10 sm:items-center min-h-screen bg-dots-darker bg-center bg-slate-300 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white">
                 <div className="sm:fixed sm:top-0 sm:right-0 p-6 text-end">
                     {auth.user ? (
                         <Link
@@ -124,6 +128,11 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
                     )}
                 </div>
 
+
+                <div className='mb-10 flex w-96 justify-center text-5xl  border-red-700 border-2 rounded-lg'>
+                    <div className='font-semibold underline flex p-2 justify-center items-center text-red-800 border-red-700 border-r-2'>Score:</div>
+                    <div className='font-bold w-full flex p-2 justify-center items-center bg-red-800 text-slate-300'> {score} </div>
+                </div>
                 <div className="w-96 bg-slate-400 h-96 rounded-md flex justify-evenly items-center flex-wrap">
                 {
                     rows.map((v,i) => <NumberBlock text={v} key={`${i}`}  />)
