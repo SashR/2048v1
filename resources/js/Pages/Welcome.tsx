@@ -3,9 +3,31 @@ import { PageProps } from '@/types';
 import NumberBlock from './../2048/NumberBlock';
 import { useEffect, useState } from 'react';
 
+interface Moveset {
+    left: Array<number|null>,
+    right: Array<number|null>,
+    up: Array<number|null>,
+    down: Array<number|null>
+}
+
+enum Key {
+    ArrowLeft='ArrowLeft', ArrowRight='ArrowRight', ArrowUp='ArrowUp', ArrowDown='ArrowDown',
+}
+
 export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<{ laravelVersion: string, phpVersion: string }>) {
-    const [rows, setRows] = useState(new Array(16).fill(null));
-    const [score, setScore] = useState(0);
+    const [rows, setRows] = useState<Array<number|null>>(new Array(16).fill(null));
+    const [prev, setPrev] = useState<Array<number|null>>(new Array(16).fill(null));
+    const [score, setScore] = useState<number>(0);
+    const [count, setCount] = useState<number>(0);
+    const [undoUsed, setUndoUsed] = useState<boolean>(false);
+
+    const [nextMoves, setNextMoves] = useState<Moveset>({left:[], down:[], right: [], up: []});
+
+    const newGame = () => setRows(rows => generate(new Array(16).fill(null)));
+    const undo = () => {
+        setRows(prev);
+        setUndoUsed(true);
+    };
 
     const combine = (arr: number[], fwd:boolean = true) => {
         const op: number[] = [];
@@ -42,7 +64,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
             const temp: number[] = combine(rows.slice(i, i+4).filter(v=>typeof v=='number'));
             op.push(...temp, ...(new Array(4-temp.length).fill(null)));
         }
-        return generate(op);
+        return op;
     }
 
     const rightShift = (rows:Array<number|null>):Array<number|null> => {
@@ -51,7 +73,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
             const temp: number[] = combine(rows.slice(i, i+4).filter(v=>typeof v=='number'), false);
             op.push(...(new Array(4-temp.length).fill(null)),...temp);
         }
-        return generate(op);
+        return op;
     }
 
     const upShift = (arr: Array<number|null>): Array<number|null> => {
@@ -60,7 +82,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
             const temp: number[] = combine([arr[i], arr[i+4], arr[i+8], arr[i+12]].filter(v=>typeof v=='number'));
             [op[i], op[i+4], op[i+8], op[i+12]] = [...temp, ...(new Array(4-temp.length).fill(null))];
         }
-        return generate(op);
+        return op;
     }
 
     const downShift = (arr: Array<number|null>): Array<number|null> => {
@@ -69,14 +91,13 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
             const temp: number[] = combine([arr[i], arr[i+4], arr[i+8], arr[i+12]].filter(v=>typeof v=='number'), false);
             [op[i], op[i+4], op[i+8], op[i+12]] = [...(new Array(4-temp.length).fill(null)), ...temp];
         }
-        return generate(op);
+        return op;
     }
 
     useEffect(() => {
         setRows(rows => generate(rows));
         // Add event listener for keydown event
         window.addEventListener('keydown', handleKeyDown);
-        generate(rows);
         // Clean up event listener on component unmount
         return () => {
           window.removeEventListener('keydown', handleKeyDown);
@@ -84,16 +105,25 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
       }, []);
 
     useEffect(()=>{
-        console.log("Changed: ", rows);
+        setNextMoves({ down: downShift(rows), left: leftShift(rows), right: rightShift(rows), up: upShift(rows) });
     }, rows);
 
+    const move = (key: Key, arr: Array<number|null>) => {
+        setPrev(arr);
+        let temp = [...arr];
+        if (key == Key.ArrowLeft) temp = leftShift(temp);
+        else if (key == Key.ArrowRight) temp = rightShift(temp);
+        else if (key == Key.ArrowUp) temp = upShift(temp);
+        else if (key == Key.ArrowDown) temp = downShift(temp);
+
+        return generate(temp);
+    }
+
     const handleKeyDown = (event: KeyboardEvent):void => {
-        switch(event.key){
-            case 'ArrowLeft': setRows(rows => leftShift(rows)); break;
-            case 'ArrowRight': setRows(rows => rightShift(rows)); break;
-            case 'ArrowUp': setRows(rows => upShift(rows)); break;
-            case 'ArrowDown': setRows(rows => downShift(rows)); break;
-        }
+        setCount(count => count+1);
+        setUndoUsed(false);
+        setPrev(rows);
+        if(Object.values(Key).includes(event.key as Key)) setRows(rows => move(event.key as Key, rows));
     };
 
 
@@ -129,14 +159,24 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
                 </div>
 
 
-                <div className='mb-10 flex w-96 justify-center text-5xl  border-red-700 border-2 rounded-lg'>
-                    <div className='font-semibold underline flex p-2 justify-center items-center text-red-800 border-red-700 border-r-2'>Score:</div>
-                    <div className='font-bold w-full flex p-2 justify-center items-center bg-red-800 text-slate-300'> {score} </div>
+                <div className='mb-10 flex w-80 justify-center text-3xl border-red-700 border-2 rounded-lg'>
+                    <div className='w-1/2'>
+                        <div className='font-semibold underline flex p-2 justify-center items-center text-red-800 border-red-700 border-r-2'>Score:</div>
+                        <div className='font-bold w-full flex p-2 justify-center items-center bg-red-800 text-slate-300'> {score} </div>
+                    </div>
+                    <div className='w-1/2'>
+                        <div className='font-semibold underline flex p-2 justify-center items-center bg-red-800 text-slate-300 border-red-700 border-r-2'>Moves:</div>
+                        <div className='font-bold w-full flex p-2 justify-center items-center text-red-800'> {count} </div>
+                    </div>
                 </div>
                 <div className="w-96 bg-slate-400 h-96 rounded-md flex justify-evenly items-center flex-wrap">
                 {
                     rows.map((v,i) => <NumberBlock text={v} key={`${i}`}  />)
                 }
+                </div>
+                <div className='w-96 flex justify-evenly mt-8'>
+                    <button onClick={newGame} className='bg-slate-200 text-xl py-2 px-4 rounded-lg w-36'> New game </button>
+                    <button onClick={undo} disabled={undoUsed} className='bg-slate-200 text-xl py-2 px-4 rounded-lg w-36'> Undo </button>
                 </div>
 
                 <div className='hidden bg-red-50 text-slate-200'></div>
