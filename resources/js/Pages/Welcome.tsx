@@ -7,7 +7,9 @@ interface Moveset {
     left: Array<number|null>,
     right: Array<number|null>,
     up: Array<number|null>,
-    down: Array<number|null>
+    down: Array<number|null>,
+    curr: Array<number|null>,
+    prev: Array<number|null>
 }
 
 enum Key {
@@ -15,17 +17,41 @@ enum Key {
 }
 
 export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<{ laravelVersion: string, phpVersion: string }>) {
-    const [rows, setRows] = useState<Array<number|null>>(new Array(16).fill(null));
-    const [prev, setPrev] = useState<Array<number|null>>(new Array(16).fill(null));
     const [score, setScore] = useState<number>(0);
     const [count, setCount] = useState<number>(0);
     const [undoUsed, setUndoUsed] = useState<boolean>(false);
 
-    const [nextMoves, setNextMoves] = useState<Moveset>({left:[], down:[], right: [], up: []});
+    const [moves, setMoves] = useState<Moveset>({
+        left:new Array(16).fill(null),
+        down:new Array(16).fill(null),
+        right: new Array(16).fill(null),
+        up: new Array(16).fill(null),
+        curr: new Array(16).fill(null),
+        prev: new Array(16).fill(null)
+    });
 
-    const newGame = () => setRows(rows => generate(new Array(16).fill(null)));
+    const newGame = () => setMoves(moves => {
+        const temp = generate(new Array(16).fill(null));
+        return {
+            ...moves,
+            curr: temp,
+            down: downShift(temp),
+            up: upShift(temp),
+            right: rightShift(temp),
+            left: leftShift(temp)
+        }
+    });
     const undo = () => {
-        setRows(prev);
+        setMoves(moves => {
+            return {
+                ...moves,
+                curr: moves.prev,
+                down: downShift(moves.prev),
+                up: upShift(moves.prev),
+                right: rightShift(moves.prev),
+                left: leftShift(moves.prev)
+            }
+        })
         setUndoUsed(true);
     };
 
@@ -95,7 +121,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
     }
 
     useEffect(() => {
-        setRows(rows => generate(rows));
+        newGame();
         // Add event listener for keydown event
         window.addEventListener('keydown', handleKeyDown);
         // Clean up event listener on component unmount
@@ -104,26 +130,33 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
         };
       }, []);
 
-    useEffect(()=>{
-        setNextMoves({ down: downShift(rows), left: leftShift(rows), right: rightShift(rows), up: upShift(rows) });
-    }, rows);
 
-    const move = (key: Key, arr: Array<number|null>) => {
-        setPrev(arr);
-        let temp = [...arr];
-        if (key == Key.ArrowLeft) temp = leftShift(temp);
-        else if (key == Key.ArrowRight) temp = rightShift(temp);
-        else if (key == Key.ArrowUp) temp = upShift(temp);
-        else if (key == Key.ArrowDown) temp = downShift(temp);
-
-        return generate(temp);
+    const move = (key: Key, move: Moveset) => {
+        if (key == Key.ArrowLeft) return move.left;
+        else if (key == Key.ArrowRight) return move.right;
+        else if (key == Key.ArrowUp) return move.up;
+        else return move.down;
     }
 
     const handleKeyDown = (event: KeyboardEvent):void => {
-        setCount(count => count+1);
-        setUndoUsed(false);
-        setPrev(rows);
-        if(Object.values(Key).includes(event.key as Key)) setRows(rows => move(event.key as Key, rows));
+        if(Object.values(Key).includes(event.key as Key)) {
+            setMoves(moves => {
+                let temp = move(event.key as Key, moves);
+                if(temp.join(",") !== moves.curr.join(",")){
+                    temp = generate(temp);
+                    setCount(count => count+1);
+                    setUndoUsed(false);
+                }
+                return {
+                    prev: moves.curr,
+                    curr: temp,
+                    down: downShift(temp),
+                    up: upShift(temp),
+                    right: rightShift(temp),
+                    left: leftShift(temp)
+                }
+            });
+        }
     };
 
 
@@ -171,7 +204,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
                 </div>
                 <div className="w-96 bg-slate-400 h-96 rounded-md flex justify-evenly items-center flex-wrap">
                 {
-                    rows.map((v,i) => <NumberBlock text={v} key={`${i}`}  />)
+                    moves.curr.map((v,i) => <NumberBlock text={v} key={`${i}`}  />)
                 }
                 </div>
                 <div className='w-96 flex justify-evenly mt-8'>
