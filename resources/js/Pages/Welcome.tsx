@@ -4,36 +4,42 @@ import NumberBlock from './../2048/NumberBlock';
 import { useEffect, useState } from 'react';
 
 interface Moveset {
-    left: Array<number|null>,
-    right: Array<number|null>,
-    up: Array<number|null>,
-    down: Array<number|null>,
-    curr: Array<number|null>,
-    prev: Array<number|null>
+    left        : Array<number|null>,
+    right       : Array<number|null>,
+    up          : Array<number|null>,
+    down        : Array<number|null>,
+    curr        : Array<number|null>,
+    prev        : Array<number|null>,
+    score       : number,
+    tempScore   : number
 }
 
 enum Key {
     ArrowLeft='ArrowLeft', ArrowRight='ArrowRight', ArrowUp='ArrowUp', ArrowDown='ArrowDown',
 }
 
-export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<{ laravelVersion: string, phpVersion: string }>) {
-    const [score, setScore] = useState<number>(0);
+export default function Welcome({ auth }: PageProps) {
+    // const [score, setScore] = useState<number>(0);
     const [count, setCount] = useState<number>(0);
     const [undoUsed, setUndoUsed] = useState<boolean>(false);
 
     const [moves, setMoves] = useState<Moveset>({
-        left:new Array(16).fill(null),
-        down:new Array(16).fill(null),
-        right: new Array(16).fill(null),
-        up: new Array(16).fill(null),
-        curr: new Array(16).fill(null),
-        prev: new Array(16).fill(null)
+        left        : new Array(16).fill(null),
+        down        : new Array(16).fill(null),
+        right       : new Array(16).fill(null),
+        up          : new Array(16).fill(null),
+        curr        : new Array(16).fill(null),
+        prev        : new Array(16).fill(null),
+        score       : 0,
+        tempScore   : 0
     });
 
     const newGame = () => setMoves(moves => {
         const temp = generate(new Array(16).fill(null));
         return {
             ...moves,
+            score: 0,
+            tempScore: 0,
             curr: temp,
             down: downShift(temp),
             up: upShift(temp),
@@ -60,7 +66,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
         if(fwd){
             for(let i=0; i<arr.length; i++){
                 if(i<arr.length-1 && arr[i]==arr[i+1]){
-                    setScore(score=> score+arr[i]*2);
+                    setMoves(moves=> {return {...moves, tempScore: moves.score+arr[i]*2}});
                     op.push(arr[i]*2);
                     i++;
                 } else op.push(arr[i]);
@@ -68,7 +74,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
         } else {
             for(let i=arr.length-1; i>=0; i--){
                 if(i>0 && arr[i]==arr[i-1]){
-                    setScore(score=> score+arr[i]*2);
+                    setMoves(moves=> {return {...moves, tempScore: moves.score+arr[i]*2}});
                     op.unshift(arr[i]*2);
                     i--;
                 } else op.unshift(arr[i]);
@@ -148,6 +154,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
                     setUndoUsed(false);
                 }
                 return {
+                    ...moves,
                     prev: moves.curr,
                     curr: temp,
                     down: downShift(temp),
@@ -195,7 +202,7 @@ export default function Welcome({ auth, laravelVersion, phpVersion }: PageProps<
                 <div className='mb-10 flex w-80 justify-center text-3xl border-red-700 border-2 rounded-lg'>
                     <div className='w-1/2'>
                         <div className='font-semibold underline flex p-2 justify-center items-center text-red-800 border-red-700 border-r-2'>Score:</div>
-                        <div className='font-bold w-full flex p-2 justify-center items-center bg-red-800 text-slate-300'> {score} </div>
+                        <div className='font-bold w-full flex p-2 justify-center items-center bg-red-800 text-slate-300'> {moves.score} </div>
                     </div>
                     <div className='w-1/2'>
                         <div className='font-semibold underline flex p-2 justify-center items-center bg-red-800 text-slate-300 border-red-700 border-r-2'>Moves:</div>
