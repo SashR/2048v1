@@ -1,7 +1,22 @@
 import { Link, Head } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import NumberBlock from './../2048/NumberBlock';
-import { useEffect, useState } from 'react';
+import { EffectCallback, useEffect, useState } from 'react';
+
+interface Scores {
+    left: number, right: number, up: number, down:number
+}
+
+class NextMove {
+    move: Array<number|null>;
+    score: number;
+    constructor(move: Array<number|null>, score:number) {
+        this.move = move;
+        this.score = score;
+    }
+}
+
+const clearScores: Scores = {down:0, left:0, right:0, up:0}
 
 interface Moveset {
     left        : Array<number|null>,
@@ -11,7 +26,8 @@ interface Moveset {
     curr        : Array<number|null>,
     prev        : Array<number|null>,
     score       : number,
-    tempScore   : number
+    tempScores  : Scores,
+    status      : 'lost'|'won'|'pending'
 }
 
 enum Key {
@@ -19,7 +35,6 @@ enum Key {
 }
 
 export default function Welcome({ auth }: PageProps) {
-    // const [score, setScore] = useState<number>(0);
     const [count, setCount] = useState<number>(0);
     const [undoUsed, setUndoUsed] = useState<boolean>(false);
 
@@ -31,20 +46,24 @@ export default function Welcome({ auth }: PageProps) {
         curr        : new Array(16).fill(null),
         prev        : new Array(16).fill(null),
         score       : 0,
-        tempScore   : 0
+        tempScores  : clearScores,
+        status      : 'pending'
     });
 
     const newGame = () => setMoves(moves => {
-        const temp = generate(new Array(16).fill(null));
+        // const temp = generate(new Array(16).fill(null));
+        // const temp = generate([1024, 1024, ...new Array(14).fill(null)]);                // win test
+        const temp = generate([2,4,8,16,4,8,16,32,8,16,32,64,16,32,64,64]);                 // lost test
         return {
             ...moves,
             score: 0,
-            tempScore: 0,
+            tempScores: clearScores,
             curr: temp,
             down: downShift(temp),
             up: upShift(temp),
             right: rightShift(temp),
-            left: leftShift(temp)
+            left: leftShift(temp),
+            status: 'pending'
         }
     });
     const undo = () => {
@@ -55,18 +74,19 @@ export default function Welcome({ auth }: PageProps) {
                 down: downShift(moves.prev),
                 up: upShift(moves.prev),
                 right: rightShift(moves.prev),
-                left: leftShift(moves.prev)
+                left: leftShift(moves.prev),
+                status: 'pending'
             }
         })
         setUndoUsed(true);
     };
 
-    const combine = (arr: number[], fwd:boolean = true) => {
+    const combine = (arr: number[], fwd:boolean = true, callback=(incr:number)=>{}) => {
         const op: number[] = [];
         if(fwd){
             for(let i=0; i<arr.length; i++){
                 if(i<arr.length-1 && arr[i]==arr[i+1]){
-                    setMoves(moves=> {return {...moves, tempScore: moves.score+arr[i]*2}});
+                    callback(arr[i]*2);
                     op.push(arr[i]*2);
                     i++;
                 } else op.push(arr[i]);
@@ -74,7 +94,7 @@ export default function Welcome({ auth }: PageProps) {
         } else {
             for(let i=arr.length-1; i>=0; i--){
                 if(i>0 && arr[i]==arr[i-1]){
-                    setMoves(moves=> {return {...moves, tempScore: moves.score+arr[i]*2}});
+                    callback(arr[i]*2);
                     op.unshift(arr[i]*2);
                     i--;
                 } else op.unshift(arr[i]);
@@ -92,37 +112,45 @@ export default function Welcome({ auth }: PageProps) {
 
     const leftShift = (rows:Array<number|null>):Array<number|null> => {
         const op = [];
+        let score = 0;
         for(let i=0; i<15; i+=4){
-            const temp: number[] = combine(rows.slice(i, i+4).filter(v=>typeof v=='number'));
+            const temp: number[] = combine(rows.slice(i, i+4).filter(v=>typeof v=='number'), true, (incr)=>{score = score+incr;});
             op.push(...temp, ...(new Array(4-temp.length).fill(null)));
         }
+        setMoves(moves => {return {...moves, tempScores:{...moves.tempScores, left: score}};});
         return op;
     }
 
     const rightShift = (rows:Array<number|null>):Array<number|null> => {
         const op = [];
+        let score = 0;
         for(let i=0; i<15; i+=4){
-            const temp: number[] = combine(rows.slice(i, i+4).filter(v=>typeof v=='number'), false);
+            const temp: number[] = combine(rows.slice(i, i+4).filter(v=>typeof v=='number'), false, (incr)=>{score = score+incr;});
             op.push(...(new Array(4-temp.length).fill(null)),...temp);
         }
+        setMoves(moves => {return {...moves, tempScores:{...moves.tempScores, right: score}};});
         return op;
     }
 
     const upShift = (arr: Array<number|null>): Array<number|null> => {
         const op = (new Array(15)).fill(null);
+        let score = 0;
         for(let i=0; i<4; i++){
-            const temp: number[] = combine([arr[i], arr[i+4], arr[i+8], arr[i+12]].filter(v=>typeof v=='number'));
+            const temp: number[] = combine([arr[i], arr[i+4], arr[i+8], arr[i+12]].filter(v=>typeof v=='number'), true, (incr)=>{score = score+incr;});
             [op[i], op[i+4], op[i+8], op[i+12]] = [...temp, ...(new Array(4-temp.length).fill(null))];
         }
+        setMoves(moves => {return {...moves, tempScores:{...moves.tempScores, up: score}}});
         return op;
     }
 
     const downShift = (arr: Array<number|null>): Array<number|null> => {
         const op = (new Array(15)).fill(null);
+        let score = 0;
         for(let i=0; i<4; i++){
-            const temp: number[] = combine([arr[i], arr[i+4], arr[i+8], arr[i+12]].filter(v=>typeof v=='number'), false);
+            const temp: number[] = combine([arr[i], arr[i+4], arr[i+8], arr[i+12]].filter(v=>typeof v=='number'), false, (incr)=>{score = score+incr});
             [op[i], op[i+4], op[i+8], op[i+12]] = [...(new Array(4-temp.length).fill(null)), ...temp];
         }
+        setMoves(moves => {return {...moves, tempScores:{...moves.tempScores, down: score}}});
         return op;
     }
 
@@ -134,33 +162,40 @@ export default function Welcome({ auth }: PageProps) {
         return () => {
           window.removeEventListener('keydown', handleKeyDown);
         };
-      }, []);
+    }, []);
 
-
-    const move = (key: Key, move: Moveset) => {
-        if (key == Key.ArrowLeft) return move.left;
-        else if (key == Key.ArrowRight) return move.right;
-        else if (key == Key.ArrowUp) return move.up;
-        else return move.down;
+    const move = (key: Key, move: Moveset):NextMove => {
+        if (key == Key.ArrowLeft) return new NextMove(move.left, move.tempScores.left);
+        else if (key == Key.ArrowRight) return new NextMove(move.right, move.tempScores.right);
+        else if (key == Key.ArrowUp) return new NextMove(move.up, move.tempScores.up);
+        else return new NextMove(move.down, move.tempScores.down);
     }
 
     const handleKeyDown = (event: KeyboardEvent):void => {
         if(Object.values(Key).includes(event.key as Key)) {
             setMoves(moves => {
-                let temp = move(event.key as Key, moves);
-                if(temp.join(",") !== moves.curr.join(",")){
+                if(moves.status == 'won') return moves;
+                let mv = move(event.key as Key, moves);
+                let [temp, plusScore] = [mv.move, mv.score];
+                const numset = (arr:Array<number|null>):string => arr.join(",");
+                if(numset(temp) !== numset(moves.curr)){
                     temp = generate(temp);
                     setCount(count => count+1);
                     setUndoUsed(false);
                 }
+                const [left,right,up,down] = [leftShift(temp), rightShift(temp),upShift(temp), downShift(temp)];
+                const lossCheck = (new Set([left,right,up,down,temp].map(numset))).size === 1;
+
                 return {
                     ...moves,
+                    score: moves.score + plusScore,
                     prev: moves.curr,
                     curr: temp,
-                    down: downShift(temp),
-                    up: upShift(temp),
-                    right: rightShift(temp),
-                    left: leftShift(temp)
+                    down: down,
+                    up: up,
+                    right: right,
+                    left: left,
+                    status: temp.includes(2048) ? 'won' : lossCheck ? 'lost' : 'pending'
                 }
             });
         }
@@ -209,10 +244,19 @@ export default function Welcome({ auth }: PageProps) {
                         <div className='font-bold w-full flex p-2 justify-center items-center text-red-800'> {count} </div>
                     </div>
                 </div>
-                <div className="w-96 bg-slate-400 h-96 rounded-md flex justify-evenly items-center flex-wrap">
+                <div className="w-96 relative bg-slate-400 h-96 rounded-md flex justify-evenly items-center flex-wrap">
                 {
                     moves.curr.map((v,i) => <NumberBlock text={v} key={`${i}`}  />)
                 }
+                    {
+                    (moves.status == 'won' || moves.status == 'lost')  &&
+                    <div
+                        className={'transition-all ease-in duration-1000 scale-105 absolute text-7xl italic font-bold w-full h-full flex justify-center items-center ' + (moves.status=='won'?'text-green-500':'text-red-500')}
+                        style={{backgroundColor:'rgba(0, 0, 0, 0.61)'}}
+                    >
+                        You {moves.status}!
+                    </div>
+                    }
                 </div>
                 <div className='w-96 flex justify-evenly mt-8'>
                     <button onClick={newGame} className='bg-slate-200 text-xl py-2 px-4 rounded-lg w-36'> New game </button>
@@ -221,7 +265,7 @@ export default function Welcome({ auth }: PageProps) {
 
                 <div className='hidden bg-red-50 text-slate-200'></div>
                 <div className='hidden bg-red-100 text-slate-700'></div>
-                <div className='hidden bg-red-200'></div>
+                <div className='hidden bg-red-200 text-green-500'></div>
                 <div className='hidden bg-red-300'></div>
                 <div className='hidden bg-red-400'></div>
                 <div className='hidden bg-red-500'></div>
