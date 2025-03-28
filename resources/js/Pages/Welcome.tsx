@@ -3,7 +3,7 @@ import { PageProps } from '@/types';
 import NumberBlock from './../2048/NumberBlock';
 import { useEffect, useState } from 'react';
 import { Key, Data, clearScores } from '@/types/2048types';
-import { combine, generate, move } from '@/types/2048pureFunctions';
+import { generate, move, leftShift, downShift, rightShift, upShift } from '@/types/2048pureFunctions';
 import axios from 'axios';
 
 
@@ -29,18 +29,18 @@ export default function Welcome({ auth }: PageProps) {
         setUndoUsed(false);
         setUndoAvailable(3);
         setData(data => {
-            // const temp = generate(new Array(16).fill(null));
-            const temp = generate([1024, 512, 512, ...new Array(13).fill(null)]);                // win test
+            const temp = generate(new Array(16).fill(null));
+            // const temp = generate([1024, 512, 512, ...new Array(13).fill(null)]);                // win test
             // const temp = generate([2,4,8,16,4,8,16,32,8,16,32,64,16,32,64,64]);                 // lost test
             return {
                 ...data,
                 score: 0,
                 tempScores: clearScores,
                 curr: temp,
-                down: downShift(temp),
-                up: upShift(temp),
-                right: rightShift(temp),
-                left: leftShift(temp),
+                down: downShift(temp,addScoreDown),
+                up: upShift(temp,addScoreUp),
+                right: rightShift(temp,addScoreRight),
+                left: leftShift(temp,addScoreLeft),
                 status: 'pending'
             }
         })
@@ -50,10 +50,10 @@ export default function Welcome({ auth }: PageProps) {
             return {
                 ...data,
                 curr: data.prev,
-                down: downShift(data.prev),
-                up: upShift(data.prev),
-                right: rightShift(data.prev),
-                left: leftShift(data.prev),
+                down: downShift(data.prev, addScoreDown),
+                up: upShift(data.prev, addScoreUp),
+                right: rightShift(data.prev,addScoreRight),
+                left: leftShift(data.prev,addScoreLeft),
                 status: 'pending'
             }
         })
@@ -61,49 +61,10 @@ export default function Welcome({ auth }: PageProps) {
         setUndoUsed(true);
     };
 
-    const leftShift = (rows:Array<number|null>):Array<number|null> => {
-        const op = [];
-        let score = 0;
-        for(let i=0; i<15; i+=4){
-            const temp: number[] = combine(rows.slice(i, i+4).filter(v=>typeof v=='number'), true, (incr)=>{score = score+incr;});
-            op.push(...temp, ...(new Array(4-temp.length).fill(null)));
-        }
-        setData(data => {return {...data, tempScores:{...data.tempScores, left: score}};});
-        return op;
-    }
-
-    const rightShift = (rows:Array<number|null>):Array<number|null> => {
-        const op = [];
-        let score = 0;
-        for(let i=0; i<15; i+=4){
-            const temp: number[] = combine(rows.slice(i, i+4).filter(v=>typeof v=='number'), false, (incr)=>{score = score+incr;});
-            op.push(...(new Array(4-temp.length).fill(null)),...temp);
-        }
-        setData(data => {return {...data, tempScores:{...data.tempScores, right: score}};});
-        return op;
-    }
-
-    const upShift = (arr: Array<number|null>): Array<number|null> => {
-        const op = (new Array(15)).fill(null);
-        let score = 0;
-        for(let i=0; i<4; i++){
-            const temp: number[] = combine([arr[i], arr[i+4], arr[i+8], arr[i+12]].filter(v=>typeof v=='number'), true, (incr)=>{score = score+incr;});
-            [op[i], op[i+4], op[i+8], op[i+12]] = [...temp, ...(new Array(4-temp.length).fill(null))];
-        }
-        setData(data => {return {...data, tempScores:{...data.tempScores, up: score}}});
-        return op;
-    }
-
-    const downShift = (arr: Array<number|null>): Array<number|null> => {
-        const op = (new Array(15)).fill(null);
-        let score = 0;
-        for(let i=0; i<4; i++){
-            const temp: number[] = combine([arr[i], arr[i+4], arr[i+8], arr[i+12]].filter(v=>typeof v=='number'), false, (incr)=>{score = score+incr});
-            [op[i], op[i+4], op[i+8], op[i+12]] = [...(new Array(4-temp.length).fill(null)), ...temp];
-        }
-        setData(data => {return {...data, tempScores:{...data.tempScores, down: score}}});
-        return op;
-    }
+    const addScoreLeft = (score:number) => setData(data => {return {...data, tempScores:{...data.tempScores, left: score}};});
+    const addScoreRight = (score:number) => setData(data => {return {...data, tempScores:{...data.tempScores, right: score}};});
+    const addScoreUp = (score:number) => setData(data => {return {...data, tempScores:{...data.tempScores, up: score}};});
+    const addScoreDown = (score:number) => setData(data => {return {...data, tempScores:{...data.tempScores, down: score}};});
 
     useEffect(() => {
         newGame();
@@ -116,17 +77,15 @@ export default function Welcome({ auth }: PageProps) {
     }, []);
 
     useEffect(()=>{
-        if(data.status=='won') storeData(count, data.score, 'Player');
+        if(data.status=='won') storeData(count, data.score);
     },[data.status])
 
-    const storeData = async (moves:number, score:number, name:string) => {
+    const storeData = async (moves:number, score:number) => {
         try {
             const resp = await axios.post('/store-score', {
-                name: name, score: score, moves: moves
+                score: score, moves: moves
             });
-        } catch (e:any){
-
-        }
+        } catch (e:any){}
     }
 
     const handleKeyDown = (event: KeyboardEvent):void => {
@@ -141,7 +100,7 @@ export default function Welcome({ auth }: PageProps) {
                     setCount(count => count+1);
                     setUndoUsed(false);
                 }
-                const [left,right,up,down] = [leftShift(temp), rightShift(temp),upShift(temp), downShift(temp)];
+                const [left,right,up,down] = [leftShift(temp,addScoreLeft), rightShift(temp,addScoreRight),upShift(temp,addScoreUp), downShift(temp,addScoreDown)];
                 const lossCheck = (new Set([left,right,up,down,temp].map(numset))).size === 1;
 
                 return {
@@ -158,7 +117,7 @@ export default function Welcome({ auth }: PageProps) {
     return (
         <>
             <Head title="Welcome"/>
-            <div className="relative sm:flex flex-col sm:justify-start pt-10 sm:items-center min-h-screen bg-dots-darker bg-center bg-slate-300 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white">
+            <div className="relative flex flex-col sm:justify-start pt-10 items-center min-h-screen bg-dots-darker bg-center bg-slate-300 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white">
 
 
                 <div className='mb-10 flex w-80 justify-center text-3xl border-red-700 border-2 rounded-lg'>

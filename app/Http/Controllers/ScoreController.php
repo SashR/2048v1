@@ -11,13 +11,21 @@ class ScoreController extends Controller
         $v = $req->validate([
             'score' => 'required|integer|min:0',
             'moves' => 'required|integer|min:0',
-            'name'  => 'required|string|min:5'
         ]);
+        $checkIp = Score::where('ip', $req->ip())->first();
+        if(isset($checkIp)) $name = $checkIp->name;
+        else {
+            do {
+                $name = bin2hex(random_bytes(7));
+                $checkName = Score::where('name', $name)->first();
+            } while(is_null($checkName));
+        }
 
         Score::insert([
             'score' => $v['score'],
             'moves' => $v['moves'],
-            'name'  => $v['name']
+            'name'  => $name,
+            'ip'    => $req->ip()
         ]);
     }
 }
