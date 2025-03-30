@@ -6,7 +6,7 @@ import Game2048 from '../2048/Game2048';
 import GameMinesweeper from '@/2048/GameMinesweeper';
 
 export default function Welcome({ auth }: PageProps) {
-    const [game, setGame] = useState<'2048'|'minesweeper'>('2048');
+    const [game, setGame] = useState<'2048'|'minesweeper'>('minesweeper');
 
 
     return (
