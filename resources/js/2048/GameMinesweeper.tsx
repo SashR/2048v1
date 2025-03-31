@@ -43,6 +43,69 @@ export default function GameMinesweeper () {
         }
     }
 
+    const tileClick = (pos: number) => {
+        console.log(pos);
+        setData((data)=>{
+            const temp = [...data.tiles];
+            temp[pos] = {...temp[pos], clicked: true}
+            return {
+                ...data,
+                tiles: temp
+            }
+        });
+    }
+
+    const cascadeClear = (pos:number) => {
+        const temp: TileData[] = data.tiles;
+                // If click on an empty tile, clear on tiles that connected to it, check image for reference
+        let [empty, vertical, toReview]: [number[],boolean, number[]] = [[],false, [pos]];
+        // Clicked on tile 15, it is empty
+        while(toReview.length > 0){
+            for(let v of toReview){
+                const a:number[] = [];
+                if(vertical){
+                    const colStart: number = v%30;
+                    // Traverse to the top
+                    for(let i=v-30; i>=colStart;i-=30){
+                        if(temp[i].value == 0 && ![...toReview,...a,...empty].includes(i)) a.push(i);   // Empty value check => Add to toReview
+                        else break;                                                                     // Stop if hitting a non-zero number
+                    }
+                    // Traverse to the bottom
+                    for(let i=v+30; i<=420+colStart;i+=30){
+                        if(temp[i].value == 0 && ![...toReview,...a,...empty].includes(i)) a.push(i);   // Empty value check => Add to toReview
+                        else break;                                                                     // Stop if hitting a non-zero number
+                    }
+                } else {
+                    const rowStart: number = Math.floor(v/30)*30;
+                    // Traverse to the left
+                    for(let i=v-1; i>=rowStart;i--){
+                        if(temp[i].value == 0 && ![...toReview,...a,...empty].includes(i)) a.push(i);   // Empty value check => Add to toReview
+                        else break;                                                                     // Stop if hitting a non-zero number
+                    }
+                    // Traverse to the right
+                    for(let i=v+1; i<rowStart+30;i++){
+                        if(temp[i].value == 0 && ![...toReview,...a,...empty].includes(i)) a.push(i);   // Empty value check => Add to toReview
+                        else break;                                                                     // Stop if hitting a non-zero number
+                    }
+                }
+                toReview = [...toReview.filter(v1=>v1!=v), ...a];                       // Removes v from toReview
+                empty.push(v);                                                          // Pushes v to empty
+                vertical = !vertical;                                                   // Switches movement
+            }
+        }
+        // Find first non-zero pos to the left and right, generate array
+        // => empty = [], vertical=true; toReview = [14, 15, 16, 17]           ; if the last move is vertical, set vertical to true, else set vertical to false
+        // Loop through this array, going top and down getting empty position, as doing so set clicked property on these positions
+        // => empty = [14, 15, 16, 17]; vertical=false; toReview = [44,74,104,134,164,45,65,46,76,47,77]
+        // Loop through this array, going left and right getting empty position (if it not in empty or toReview), as doing so set clicked property on these positions
+        // => empty = [14, 15, 16, 17, 44,74,104,134,164,45,65,46,76,47,77]; vertical=true; toReview = [78,79,80]
+        // Loop through this array, going up and down getting empty position (if it not in empty or toReview), as doing so set clicked property on these positions
+        // => empty = [14, 15, 16, 17, 44,74,104,134,164,45,65,46,76,47,77,78,79,80]; vertical=false; toReview = [108,138,168,109,139]
+        // Loop through this array, going left and right getting empty position (if it not in empty or toReview), as doing so set clicked property on these positions
+        // => empty = [14, 15, 16, 17, 44,74,104,134,164,45,65,46,76,47,77,78,79,80,108,138,168,109,139]; vertical=true; toReview = []
+        // Since toReview is empty, exit function
+    }
+
     const newGame = () => {
         setData((data)=>{
             // Generate 99 random numbers between 0 and 449
@@ -62,7 +125,7 @@ export default function GameMinesweeper () {
                 // i>450-1-30 => bottom row, so nothin is below it
             return {
                 ...data,
-                tiles: temp.map((t,i) => new TileData(bombCount(t.value, i, temp), false))
+                tiles: temp.map((t,i) => new TileData(bombCount(t.value, i, temp), true))
             }
         });
 
@@ -82,9 +145,9 @@ export default function GameMinesweeper () {
         <>
             <div
                 className="relative bg-slate-400 rounded-md flex justify-evenly items-center flex-wrap"
-                style={{width: '750px', height:'375px'}}
+                style={{width: '900px', height:'450px'}}
             >
-                { data.tiles.map((t,i)=> <Tile key={i+1} value={t.value} />) }
+                { data.tiles.map((t,i)=> <Tile key={i+1} value={t.value} clicked={t.clicked} position={i} onClick={tileClick} />) }
             </div>
 
             <div className='w-96 flex justify-evenly mt-8'>
