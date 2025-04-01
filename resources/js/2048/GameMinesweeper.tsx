@@ -20,9 +20,14 @@ export default function GameMinesweeper () {
         tiles: new Array(450).fill(new TileData(2,true)),
         totalMines: 79
     });
-    // const [totalMines, setTotalMines]
 
     const bombCount = (v:number,i:number, tiles: Array<TileData>) => {
+        // At num counts to all of the locations without -1s (between 0 and 8)
+        // Rules
+            // i < 30 => top row, so nothing is above it
+            // (i+1)%30==0 => last column, so nothing is to the right it
+            // i/30==0 => first column, so nothing is to the left of it
+            // i>450-1-30 => bottom row, so nothin is below it
         if(v == -1) return v;
         else {
             let temp = 0;
@@ -44,7 +49,20 @@ export default function GameMinesweeper () {
     }
 
     const tileClick = (pos: number) => {
-        console.log(pos);
+        // console.log(pos);
+        cascadeClear(pos, clickTile);
+        clickTile(pos);
+        // setData((data)=>{
+        //     const temp = [...data.tiles];
+        //     temp[pos] = {...temp[pos], clicked: true}
+        //     return {
+        //         ...data,
+        //         tiles: temp
+        //     }
+        // });
+    }
+
+    const clickTile = (pos: number) => {
         setData((data)=>{
             const temp = [...data.tiles];
             temp[pos] = {...temp[pos], clicked: true}
@@ -55,44 +73,70 @@ export default function GameMinesweeper () {
         });
     }
 
-    const cascadeClear = (pos:number) => {
+    const cascadeClear = (pos:number, callback: (p:number)=>void) => {
+        // AS THERE ARE BUGS CONSIDER REDOING ALGORITHM WITH SURROUDINGS FUNCTION
+
         const temp: TileData[] = data.tiles;
-                // If click on an empty tile, clear on tiles that connected to it, check image for reference
-        let [empty, vertical, toReview]: [number[],boolean, number[]] = [[],false, [pos]];
+        // If click on an empty tile, clear on tiles that connected to it, check image for reference
+        let [empty, vertical, toReview, borders]: [number[],boolean, number[], number[]] = [[],false, [pos], []];
         // Clicked on tile 15, it is empty
-        while(toReview.length > 0){
+
+        // Choose initial direction
+        if((pos>=30 && data.tiles[pos-30].value==0) || (pos<420 && data.tiles[pos+30].value==0)) vertical=true;
+
+        let count = 0; // prevent infinite loop temporarility
+        while(toReview.length > 0 && count<=8){
+            console.log("==========================================================================================================");
+            console.log(`Iteration: ${count}; To Review Array: ${toReview}; vertical: ${vertical}`);
+            count++;
+            const a:number[] = [];
             for(let v of toReview){
-                const a:number[] = [];
                 if(vertical){
+                    console.log("Moving up and down");
                     const colStart: number = v%30;
                     // Traverse to the top
                     for(let i=v-30; i>=colStart;i-=30){
                         if(temp[i].value == 0 && ![...toReview,...a,...empty].includes(i)) a.push(i);   // Empty value check => Add to toReview
-                        else break;                                                                     // Stop if hitting a non-zero number
+                        else {borders.push(i); break;}                                                                     // Stop if hitting a non-zero number
                     }
                     // Traverse to the bottom
                     for(let i=v+30; i<=420+colStart;i+=30){
                         if(temp[i].value == 0 && ![...toReview,...a,...empty].includes(i)) a.push(i);   // Empty value check => Add to toReview
-                        else break;                                                                     // Stop if hitting a non-zero number
+                        else {borders.push(i); break;}                                                                    // Stop if hitting a non-zero number
                     }
-                } else {
+                }
+                if(!vertical) {
+                    console.log("Moving left and right");
                     const rowStart: number = Math.floor(v/30)*30;
                     // Traverse to the left
                     for(let i=v-1; i>=rowStart;i--){
                         if(temp[i].value == 0 && ![...toReview,...a,...empty].includes(i)) a.push(i);   // Empty value check => Add to toReview
-                        else break;                                                                     // Stop if hitting a non-zero number
+                        else {borders.push(i); break;}                                                                       // Stop if hitting a non-zero number
                     }
                     // Traverse to the right
+                    // console.log(`Row Start: ${rowStart}`);
                     for(let i=v+1; i<rowStart+30;i++){
+                        // console.log(`To the right pos: ${i}`);
                         if(temp[i].value == 0 && ![...toReview,...a,...empty].includes(i)) a.push(i);   // Empty value check => Add to toReview
-                        else break;                                                                     // Stop if hitting a non-zero number
+                        else {borders.push(i); break;}                                                                       // Stop if hitting a non-zero number
                     }
                 }
-                toReview = [...toReview.filter(v1=>v1!=v), ...a];                       // Removes v from toReview
-                empty.push(v);                                                          // Pushes v to empty
-                vertical = !vertical;                                                   // Switches movement
+                // toReview = [...toReview.filter(v1=>v1!=v), ...a];                       // Removes v from toReview
+                // empty.push(v);                                                          // Pushes v to empty
+
             }
+            empty.push(...toReview);                                                    // populate empty with all reviewed values
+            toReview.forEach(v => callback(v));                                         // execute callback for each value reviewed
+            toReview = [...a];                                                          // Load a with newest set of values to review, without already reviewed values
+            vertical = !vertical;                                                   // Switches movement
         }
+
+        console.log(`Borders: ${borders}`);
+        let borders2: number[] = [];
+        for(let v of empty) borders2.push(...genSurroundings(v));
+        borders2 = new Array(...(new Set(borders2)));
+        borders2.forEach(callback);
+        // new Array(...(new Set(borders))).map(callback);
         // Find first non-zero pos to the left and right, generate array
         // => empty = [], vertical=true; toReview = [14, 15, 16, 17]           ; if the last move is vertical, set vertical to true, else set vertical to false
         // Loop through this array, going top and down getting empty position, as doing so set clicked property on these positions
@@ -106,6 +150,24 @@ export default function GameMinesweeper () {
         // Since toReview is empty, exit function
     }
 
+    const genSurroundings = (pos:number) => {
+        let op = [];
+        const [topRow, bottomRow, leftCol, rightCol] = [pos>=30, pos<=450-1-30, pos%30!=0, (pos+1)%30!=0];
+        if(topRow){
+            op.push(pos-30);
+            if(leftCol) op.push(pos-31);
+            if(rightCol) op.push(pos-29);
+        }
+        if(leftCol) op.push(pos-1);
+        if(rightCol) op.push(pos+1);
+        if(bottomRow){
+            op.push(pos+30);
+            if(leftCol) op.push(pos+29);
+            if(rightCol) op.push(pos+31);
+        }
+        return op;
+    }
+
     const newGame = () => {
         setData((data)=>{
             // Generate 99 random numbers between 0 and 449
@@ -117,15 +179,9 @@ export default function GameMinesweeper () {
             // Create array with -1s at the location of the random numbers
             const temp = new Array(450).fill(new TileData(0,false)).map((_,i)=>new TileData(bombs.includes(i) ? -1 : 0,false));
 
-            // At num counts to all of the locations without -1s (between 0 and 8)
-            // Rules
-                // i < 30 => top row, so nothing is above it
-                // (i+1)%30==0 => last column, so nothing is to the right it
-                // i/30==0 => first column, so nothing is to the left of it
-                // i>450-1-30 => bottom row, so nothin is below it
             return {
                 ...data,
-                tiles: temp.map((t,i) => new TileData(bombCount(t.value, i, temp), true))
+                tiles: temp.map((t,i) => new TileData(bombCount(t.value, i, temp), false))
             }
         });
 

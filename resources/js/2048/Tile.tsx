@@ -22,7 +22,7 @@ export function Tile({value, clicked, onClick, position}: Props){
                     : value==-1 ? <Bomb />
                     : value
                 }
-                {!clicked && <div className="bg-slate-600 border-2 border-slate-300 absolute" style={{width: '30px', height:'30px', padding:'1px'}}> </div>}
+                {!clicked && <div className="bg-slate-600 border-2 opacity-55 border-slate-300 absolute" style={{width: '30px', height:'30px', padding:'1px'}}> </div>}
             </div>
         </>
     );
