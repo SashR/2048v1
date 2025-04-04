@@ -1,47 +1,46 @@
 import { useEffect, useState } from "react";
 import { Tile } from "./Tile";
+import { Bomb } from "./Bomb";
 
 
 class TileData {
     value: number;
     clicked: boolean;
-    constructor(value: number, clicked: boolean) {
-        [this.value, this.clicked] = [value, clicked];
+    marked: boolean;
+    constructor(value: number, clicked: boolean, marked: boolean) {
+        [this.value, this.clicked, this.marked] = [value, clicked, marked];
     }
 }
 
 interface Data {
     tiles: Array<TileData>,
     totalMines: number,
+    unmarkedMines: number,
     status: 'won'|'pending'|'lost'
 }
 
 export default function GameMinesweeper () {
     const [data, setData] = useState<Data>({
-        tiles: new Array(450).fill(new TileData(2,true)),
+        tiles: new Array(450).fill(new TileData(2,true,false)),
         totalMines: 99,
+        unmarkedMines: 99,
         status: 'pending'
     });
 
     const bombCount = (v:number,i:number, tiles: Array<TileData>) => {
         // At num counts to all of the locations without -1s (between 0 and 8)
-        // Rules
-            // i < 30 => top row, so nothing is above it
-            // (i+1)%30==0 => last column, so nothing is to the right it
-            // i/30==0 => first column, so nothing is to the left of it
-            // i>450-1-30 => bottom row, so nothin is below it
         if(v == -1) return v;
         else {
             let temp = 0;
             const [topRow, bottomRow, leftCol, rightCol] = [i>=30, i<=450-1-30, i%30!=0, (i+1)%30!=0];
-            if(topRow){
+        if(topRow){                                                                                         // i < 30 => top row, so nothing is above it
                 if(tiles[i-30].value == -1) temp += 1;
                 if(leftCol && tiles[i-31].value == -1) temp += 1;
                 if(rightCol && tiles[i-29].value == -1) temp += 1;
             }
-            if(leftCol && tiles[i-1].value == -1) temp += 1;
-            if(rightCol && tiles[i+1].value == -1) temp += 1;
-            if(bottomRow){
+            if(leftCol && tiles[i-1].value == -1) temp += 1;                                                // i/30==0 => first column, so nothing is to the left of it
+            if(rightCol && tiles[i+1].value == -1) temp += 1;                                               // (i+1)%30==0 => last column, so nothing is to the right it
+            if(bottomRow){                                                                                  // i>450-1-30 => bottom row, so nothin is below it
                 if(tiles[i+30].value == -1) temp += 1;
                 if(leftCol && tiles[i+29].value == -1) temp += 1;
                 if(rightCol && tiles[i+31].value == -1) temp += 1;
@@ -61,26 +60,26 @@ export default function GameMinesweeper () {
     }
 
     const tileClick = (pos: number) => {
-        if(data.tiles[pos].value === 0) cascadeClear(pos, clickTile);
+        if(data.tiles[pos].value === 0) cascadeClear([pos], clickTile);
         else clickTile(pos);
     }
 
     const clickTile = (pos: number) => {
-        if(data.tiles[pos].value == -1) loseEffects();
-        else {
-            setData((data)=>{
-                const temp = [...data.tiles];
-                temp[pos] = {...temp[pos], clicked: true}
-                return {
-                    ...data,
-                    tiles: temp
-                }
-            });
+        const tile = data.tiles[pos];
+        if(!tile.marked){
+            if(tile.value == -1) loseEffects();
+            else {
+                setData((data)=>{
+                    const temp = [...data.tiles];
+                    temp[pos] = {...temp[pos], clicked: true}
+                    return { ...data, tiles: temp};
+                });
+            }
         }
     }
 
-    const cascadeClear = (pos:number,callback:(p:number)=>void) => {
-        let [toBeClicked, temp]:[number[], number[]] =[[], [pos]];
+    const cascadeClear = (pos:number[],callback:(p:number)=>void) => {
+        let [toBeClicked, temp]:[number[], number[]] =[[], [...pos]];
         while(temp.length>0){
             let surroundings:number[] = [];
             // For each element in temp, generate surrounding values
@@ -93,6 +92,23 @@ export default function GameMinesweeper () {
             temp = [...surroundings.filter(v => data.tiles[v].value == 0)];
         }
         toBeClicked.forEach(callback);
+    }
+
+    const clickedCascadeClear = (pos:number, tiles: TileData[], click: (p:number)=>void) => {
+        // On Click already clicked TILE => DONE EXTERNALLY
+        const surroundings = genSurroundings(pos);
+        // If Tile has the same number of marked TILES around it as its value (not more or less)
+        if(surroundings.filter(v => tiles[v].marked).length === tiles[pos].value){
+            // Then open up all non marked surrounding tiles.
+            // IF A surrounding tile that is not marked is a bomb => You lose           => handled in click function
+            surroundings.filter(v => !tiles[v].marked).forEach(click);
+            // IF A surrounding tile that is not marked is empty i.e. has value of 0
+            if(surroundings.filter(v => !tiles[v].marked).filter(v=>tiles[v].value===0).length > 0){
+                // Then cascade
+                cascadeClear(surroundings.filter(v => !tiles[v].marked).filter(v=>tiles[v].value===0), click);
+            }
+
+        }
     }
 
     const genSurroundings = (pos:number) => {
@@ -122,19 +138,29 @@ export default function GameMinesweeper () {
                 if(!bombs.includes(num)) bombs.push(num);
             } while (bombs.length <data.totalMines);
             // Create array with -1s at the location of the random numbers
-            const temp = new Array(450).fill(new TileData(0,false)).map((_,i)=>new TileData(bombs.includes(i) ? -1 : 0,false));
+            const temp = new Array(450).fill(new TileData(0,false,false)).map((_,i)=>new TileData(bombs.includes(i) ? -1 : 0,false,false));
 
             return {
                 ...data,
-                tiles: temp.map((t,i) => new TileData(bombCount(t.value, i, temp), false))
+                status: 'pending',
+                tiles: temp.map((t,i) => new TileData(bombCount(t.value, i, temp), false,false))
             }
         });
 
     }
 
+    const handleRightClick = (pos:number) => {
+        setData((data)=>{
+            const temp = [...data.tiles];
+            temp[pos] = {...temp[pos], marked: !temp[pos].marked};
+            return {...data, tiles: temp, unmarkedMines: data.unmarkedMines + (temp[pos].marked ? -1 : 1)};
+        });
+    }
+
     useEffect(() => {
         newGame();
         // Add event listener for keydown event
+        // window.addEventListener('contextmenu', handleRightClick);
         // window.addEventListener('keydown', handleKeyDown);
         // Clean up event listener on component unmount
         // return () => {
@@ -142,18 +168,23 @@ export default function GameMinesweeper () {
         // };
     }, []);
 
+    // STILL TO BE IMPLEMENTED
+    // SINGLE CLICK ON ALREADY CLICKED TILE TO OPEN ALL NON MARKED SURROUNDING VALUES (CASCADE LIKE FUNCTION) (IF MINE INCORRECTLY MARKED, IT EXPLODES AND YOU LOSE)
+
     return (
         <>
             <div
-                className="relative bg-slate-400 rounded-md flex justify-evenly items-center flex-wrap"
+                className="relative bg-slate-400 rounded-md flex justify-evenly items-center flex-wrap cursor-pointer"
                 style={{width: '900px', height:'450px'}}
             >
-                { data.tiles.map((t,i)=> <Tile key={i+1} value={t.value} clicked={t.clicked} position={i} onClick={tileClick} />) }
+                { data.tiles.map((t,i)=>
+                    <Tile key={i+1} value={t.value} clicked={t.clicked} position={i} marked={t.marked} onClick={tileClick} onRightClick={handleRightClick}  />
+                ) }
                 {
                 (data.status == 'won' || data.status == 'lost')  &&
                 <div
-                    className={'transition-all ease-in duration-1000 scale-105 absolute text-7xl italic font-bold w-full h-full flex justify-center items-center ' + (data.status=='won'?'text-green-500':'text-red-500')}
-                    style={{backgroundColor:'rgba(0, 0, 0, 0.61)'}}
+                    className={'transition-all ease-in z-40 duration-1000 scale-105 absolute text-7xl italic font-bold w-full h-full flex justify-center items-center ' + (data.status=='won'?'text-green-500':'text-red-500')}
+                    style={{backgroundColor: data.status=='won' ? 'rgba(0, 0, 0, 0.61)' : 'transparent'}}
                 >
                     You {data.status}!
                 </div>
@@ -161,6 +192,10 @@ export default function GameMinesweeper () {
             </div>
 
             <div className='w-96 flex justify-evenly mt-8'>
+                <div className="flex justify-evenly text-xl items-center border border-white rounded-md w-36 text-slate-200">
+                    {data.unmarkedMines}
+                    <Bomb downscale />
+                </div>
                 <button onClick={newGame} className='bg-slate-200 text-xl py-2 px-4 rounded-lg w-36'> New game </button>
             </div>
         </>
