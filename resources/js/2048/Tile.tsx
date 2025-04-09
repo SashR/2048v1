@@ -1,16 +1,14 @@
-import { useEffect } from "react";
 import { Bomb } from "./Bomb";
+import { TileData } from "@/types/MinesweeperTypes";
 
 interface Props {
-    value: number|null,
-    clicked: boolean,
-    marked: boolean,
+    tile: TileData,
     position: number,
     onClick: (pos:number)=>void,
     onRightClick: (pos:number)=>void
 }
 
-export function Tile({value, clicked, onClick, position, onRightClick, marked}: Props){
+export function Tile({tile, onClick, position, onRightClick}: Props){
 
     return (
         <>
@@ -20,12 +18,12 @@ export function Tile({value, clicked, onClick, position, onRightClick, marked}: 
                 onClick={()=>onClick(position)} onContextMenu={(e)=>{e.preventDefault(); onRightClick(position);}}
             >
                 {
-                    value==0 ? ''
-                    : value==-1 ? <Bomb />
-                    : value
+                    tile.value==0 ? ''
+                    : tile.value === -1 ? <Bomb />
+                    : tile.value
                 }
-                {!clicked && <div className="bg-slate-600 border-2 z-10 opacity-55 border-slate-300 absolute" style={{width: '30px', height:'30px', padding:'1px'}}> </div>}
-                {marked && <div className="bg-red-600 border-2 z-10 opacity-55 border-red-300 absolute" style={{width: '30px', height:'30px', padding:'1px'}}> </div>}
+                { !tile.clicked && <div className="bg-slate-600 border-2 z-10 opacity-55 border-slate-300 absolute" style={{width: '30px', height:'30px', padding:'1px'}}> </div>}
+                { tile.marked && <div className="bg-red-600 border-2 z-10 opacity-55 border-red-300 absolute" style={{width: '30px', height:'30px', padding:'1px'}}> </div>}
             </div>
         </>
     );
