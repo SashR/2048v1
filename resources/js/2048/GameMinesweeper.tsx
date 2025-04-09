@@ -16,7 +16,9 @@ interface Data {
     tiles: Array<TileData>,
     totalMines: number,
     unmarkedMines: number,
-    status: 'won'|'pending'|'lost'
+    status: 'won'|'pending'|'lost',
+    mode: 'Easy'|'Medium'|'Hard'|'Extreme',
+    totalTiles: number
 }
 
 export default function GameMinesweeper () {
@@ -24,15 +26,18 @@ export default function GameMinesweeper () {
         tiles: new Array(450).fill(new TileData(2,true,false)),
         totalMines: 99,
         unmarkedMines: 99,
-        status: 'pending'
+        status: 'pending',
+        mode: 'Hard',
+        totalTiles: 450
     });
+    const modes: Array<'Easy'|'Medium'|'Hard'|'Extreme'> = ['Easy','Medium','Hard','Extreme'];
 
     const bombCount = (v:number,i:number, tiles: Array<TileData>) => {
         // At num counts to all of the locations without -1s (between 0 and 8)
         if(v == -1) return v;
         else {
             let temp = 0;
-            const [topRow, bottomRow, leftCol, rightCol] = [i>=30, i<=450-1-30, i%30!=0, (i+1)%30!=0];
+            const [topRow, bottomRow, leftCol, rightCol] = [i>=30, i<=data.totalTiles-1-30, i%30!=0, (i+1)%30!=0];
         if(topRow){                                                                                         // i < 30 => top row, so nothing is above it
                 if(tiles[i-30].value == -1) temp += 1;
                 if(leftCol && tiles[i-31].value == -1) temp += 1;
@@ -40,7 +45,7 @@ export default function GameMinesweeper () {
             }
             if(leftCol && tiles[i-1].value == -1) temp += 1;                                                // i/30==0 => first column, so nothing is to the left of it
             if(rightCol && tiles[i+1].value == -1) temp += 1;                                               // (i+1)%30==0 => last column, so nothing is to the right it
-            if(bottomRow){                                                                                  // i>450-1-30 => bottom row, so nothin is below it
+            if(bottomRow){                                                                                  // i>[total tiles]-1-30 => bottom row, so nothin is below it
                 if(tiles[i+30].value == -1) temp += 1;
                 if(leftCol && tiles[i+29].value == -1) temp += 1;
                 if(rightCol && tiles[i+31].value == -1) temp += 1;
@@ -60,8 +65,12 @@ export default function GameMinesweeper () {
     }
 
     const tileClick = (pos: number) => {
-        if(data.tiles[pos].value === 0) cascadeClear([pos], clickTile);
-        else clickTile(pos);
+        if(data.tiles[pos].clicked){
+            clickedCascadeClear(pos, data.tiles, clickTile);
+        } else {
+            if(data.tiles[pos].value === 0) cascadeClear([pos], clickTile);
+            else clickTile(pos);
+        }
     }
 
     const clickTile = (pos: number) => {
@@ -113,7 +122,7 @@ export default function GameMinesweeper () {
 
     const genSurroundings = (pos:number) => {
         let op = [];
-        const [topRow, bottomRow, leftCol, rightCol] = [pos>=30, pos<=450-1-30, pos%30!=0, (pos+1)%30!=0];
+        const [topRow, bottomRow, leftCol, rightCol] = [pos>=30, pos<=data.totalTiles-1-30, pos%30!=0, (pos+1)%30!=0];
         if(topRow){
             op.push(pos-30);
             if(leftCol) op.push(pos-31);
@@ -134,27 +143,39 @@ export default function GameMinesweeper () {
             // Generate 99 random numbers between 0 and 449
             const bombs: Array<number> = [];
             do {
-                const num = Math.floor(Math.random() * 450);
+                const num = Math.floor(Math.random() * data.totalTiles);
                 if(!bombs.includes(num)) bombs.push(num);
             } while (bombs.length <data.totalMines);
             // Create array with -1s at the location of the random numbers
-            const temp = new Array(450).fill(new TileData(0,false,false)).map((_,i)=>new TileData(bombs.includes(i) ? -1 : 0,false,false));
+            const temp = new Array(data.totalTiles).fill(new TileData(0,false,false)).map((_,i)=>new TileData(bombs.includes(i) ? -1 : 0,false,false));
 
             return {
                 ...data,
+                unmarkedMines: data.totalMines,
                 status: 'pending',
                 tiles: temp.map((t,i) => new TileData(bombCount(t.value, i, temp), false,false))
             }
         });
-
     }
 
-    const handleRightClick = (pos:number) => {
-        setData((data)=>{
-            const temp = [...data.tiles];
-            temp[pos] = {...temp[pos], marked: !temp[pos].marked};
-            return {...data, tiles: temp, unmarkedMines: data.unmarkedMines + (temp[pos].marked ? -1 : 1)};
+    const changeMode = (mode: 'Easy'|'Medium'|'Hard'|'Extreme') => {
+        setData(data => {
+            const newMines = {'Easy':49, 'Medium':79, 'Hard':99, 'Extreme':139};
+            return { ...data, mode: mode, totalMines: newMines[mode]}
         });
+        newGame();
+    }
+
+
+
+    const handleRightClick = (pos:number) => {
+        if(!data.tiles[pos].clicked && data.unmarkedMines>0){
+            setData((data)=>{
+                const temp = [...data.tiles];
+                temp[pos] = {...temp[pos], marked: !temp[pos].marked};
+                return {...data, tiles: temp, unmarkedMines: data.unmarkedMines + (temp[pos].marked ? -1 : 1)};
+            });
+        }
     }
 
     useEffect(() => {
@@ -168,14 +189,31 @@ export default function GameMinesweeper () {
         // };
     }, []);
 
+    useEffect(()=> {
+        const winCheck = data.tiles.filter(t => t.clicked).length + data.totalMines == data.tiles.length;
+        if(winCheck) setData(data => {return {...data, status: 'won'}});
+    }, [data.tiles])
+
     // STILL TO BE IMPLEMENTED
-    // SINGLE CLICK ON ALREADY CLICKED TILE TO OPEN ALL NON MARKED SURROUNDING VALUES (CASCADE LIKE FUNCTION) (IF MINE INCORRECTLY MARKED, IT EXPLODES AND YOU LOSE)
+    // Game mostly works but has some bugs and styling issues
+    // Win condition not tested
+    // Marked tiles need better styling
+    // Bomb sounds need to be added
+    // Game difficulty needs to be implemented
+    // A mode option needs to be added, so the normal click can be used for both marking and clicking. Should make the game smoother.
+        // Marking mode => Clicking unclicked tiles mark them; Clicking click tiles cascades (if possible)
+        // Clicking mode => Clicking unclicked tiles click them; Clicking click tiles cascades (if possible)
+    // Cascade when clicking on an already clicked tile works, but there are bugs
+        // If a tile getting opened is empty, it cascades. This is correct
+        // But it needs to also cascade if a tile is surround by enough marked tiles
+
+
 
     return (
         <>
             <div
                 className="relative bg-slate-400 rounded-md flex justify-evenly items-center flex-wrap cursor-pointer"
-                style={{width: '900px', height:'450px'}}
+                style={{width: `${30*data.totalTiles/15}px`, height:`${15*data.totalTiles/15}px`}}
             >
                 { data.tiles.map((t,i)=>
                     <Tile key={i+1} value={t.value} clicked={t.clicked} position={i} marked={t.marked} onClick={tileClick} onRightClick={handleRightClick}  />
@@ -191,12 +229,19 @@ export default function GameMinesweeper () {
                 }
             </div>
 
-            <div className='w-96 flex justify-evenly mt-8'>
+            <div className='w-1/2 flex justify-evenly mt-8'>
                 <div className="flex justify-evenly text-xl items-center border border-white rounded-md w-36 text-slate-200">
                     {data.unmarkedMines}
                     <Bomb downscale />
                 </div>
                 <button onClick={newGame} className='bg-slate-200 text-xl py-2 px-4 rounded-lg w-36'> New game </button>
+                <div className="text-slate-200 border border-slate-100 flex w-1/3 justify-between">
+                    {
+                        modes.map((m) => (
+                            <button onClick={()=>changeMode(m)} className={`p-1 ${data.mode == m && 'bg-slate-200 text-slate-900 '}`}> {m} </button>
+                        ))
+                    }
+                </div>
             </div>
         </>
     );
