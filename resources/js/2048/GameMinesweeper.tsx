@@ -98,11 +98,7 @@ export default function GameMinesweeper () {
 
     // STILL TO BE IMPLEMENTED
     // Game mostly works but has some bugs and styling issues
-    // Marked tiles need better styling
     // Bomb sounds need to be added
-    // A mode option needs to be added, so the normal click can be used for both marking and clicking. Should make the game smoother.
-        // Marking mode => Clicking unclicked tiles mark them; Clicking click tiles cascades (if possible)
-        // Clicking mode => Clicking unclicked tiles click them; Clicking click tiles cascades (if possible)
     // Cascade when clicking on an already clicked tile works, but there are bugs
         // If a tile getting opened is empty, it cascades. This is correct
         // But it needs to also cascade if a tile is surround by enough marked tiles

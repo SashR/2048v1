@@ -12,7 +12,7 @@ export default function Welcome({ auth }: PageProps) {
     return (
         <>
             <Head title="Welcome"/>
-            <div className="relative box-border flex flex-col sm:justify-start pt-10 items-center min-h-screen bg-dots-darker bg-center bg-slate-300 dark:bg-dots-lighter dark:bg-gray-900 selection:bg-red-500 selection:text-white">
+            <div className="relative box-border flex flex-col sm:justify-start pt-10 items-center min-h-screen bg-center bg-dots-lighter bg-gray-900 selection:bg-red-500 selection:text-white">
 
                 <div className='mb-6 flex w-1/2 justify-center text-3xl border-2 border-gray-800 rounded-lg'>
                     <button disabled={game=='2048'} onClick={()=>setGame('2048')} className='disabled:bg-green-400 disabled:underline disabled:font-extrabold disabled:w-2/3 w-1/3 flex p-2 justify-center items-center text-slate-800 bg-slate-100 border-slate-700'>2048</button>
